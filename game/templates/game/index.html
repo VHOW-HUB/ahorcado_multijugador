@@ -1,0 +1,62 @@
+{% extends 'game/base.html' %}
+
+{% block title %}Ahorcado - Menú Principal{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>🎮 Ahorcado Multijugador</h1>
+    
+    <p style="font-size: 1.2em; color: #666; margin-bottom: 40px;">
+        ¡Juega al ahorcado en tiempo real con un amigo!
+    </p>
+    
+    <div style="margin: 40px 0;">
+        <a href="{% url 'game:crear_sala' %}" class="btn">
+            Crear Nueva Sala
+        </a>
+    </div>
+    
+    <div style="margin: 40px 0;">
+        <p style="font-size: 1.1em; color: #666; margin-bottom: 15px;">
+            ¿Tienes un código de sala?
+        </p>
+        <form method="GET" id="unirse-form">
+            <input 
+                type="text" 
+                id="codigo-sala" 
+                placeholder="Ingresa el código" 
+                maxlength="6"
+                style="text-transform: uppercase;"
+                required
+            >
+            <br>
+            <button type="submit" class="btn btn-secondary">
+                Unirse a Sala
+            </button>
+        </form>
+    </div>
+    
+    <div style="margin-top: 40px; padding-top: 30px; border-top: 2px solid #eee;">
+        <h3 style="color: #667eea; margin-bottom: 15px;">📋 Cómo Jugar</h3>
+        <ul style="text-align: left; max-width: 500px; margin: 0 auto; color: #666; line-height: 1.8;">
+            <li>Crea una sala o únete con un código</li>
+            <li>Uno de los jugadores piensa una palabra</li>
+            <li>El otro intenta adivinarla letra por letra</li>
+            <li>¡Cuidado! Solo tienes 8 intentos y 90 segundos</li>
+            <li>El primero en ganar 5 rondas gana el juego</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('unirse-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const codigo = document.getElementById('codigo-sala').value.toUpperCase();
+        if (codigo) {
+            window.location.href = `/unirse/${codigo}/`;
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,671 @@
+{% extends 'game/base.html' %}
+
+{% block title %}Sala {{ codigo_sala }}{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .game-container {
+        max-width: 1000px;
+        width: 100%;
+    }
+    
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 15px;
+    }
+    
+    .score {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #667eea;
+    }
+    
+    .timer {
+        font-size: 2em;
+        font-weight: bold;
+        color: #f5576c;
+        min-width: 100px;
+    }
+    
+    .game-area {
+        display: flex;
+        gap: 40px;
+        margin: 30px 0;
+        justify-content: center;
+        align-items: flex-start;
+    }
+    
+    .hangman-svg {
+        flex-shrink: 0;
+    }
+    
+    .play-area {
+        flex: 1;
+        max-width: 500px;
+    }
+    
+    .palabra-container {
+        font-size: 2.5em;
+        letter-spacing: 10px;
+        margin: 30px 0;
+        font-family: monospace;
+        font-weight: bold;
+        color: #667eea;
+        min-height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .teclado {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+        margin: 20px 0;
+    }
+    
+    .letra-btn {
+        padding: 15px;
+        font-size: 1.2em;
+        font-weight: bold;
+        border: 2px solid #667eea;
+        background: white;
+        color: #667eea;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .letra-btn:hover:not(:disabled) {
+        background: #667eea;
+        color: white;
+        transform: scale(1.05);
+    }
+    
+    .letra-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+    }
+    
+    .status-message {
+        padding: 20px;
+        border-radius: 15px;
+        font-size: 1.3em;
+        margin: 20px 0;
+        font-weight: bold;
+    }
+    
+    .status-waiting {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-playing {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .status-input {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .input-palabra {
+        padding: 15px 20px;
+        font-size: 1.3em;
+        border: 2px solid #667eea;
+        border-radius: 50px;
+        width: 100%;
+        text-align: center;
+        margin: 20px 0;
+        text-transform: uppercase;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+    
+    .modal-content {
+        background: white;
+        padding: 50px;
+        border-radius: 20px;
+        text-align: center;
+        max-width: 500px;
+        animation: modalAppear 0.3s ease;
+    }
+    
+    @keyframes modalAppear {
+        from {
+            transform: scale(0.8);
+            opacity: 0;
+        }
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+    
+    .victoria {
+        color: #28a745;
+        font-size: 3em;
+        margin-bottom: 20px;
+    }
+    
+    .derrota {
+        color: #dc3545;
+        font-size: 3em;
+        margin-bottom: 20px;
+    }
+    
+    .hidden {
+        display: none;
+    }
+    
+    .show {
+        display: block;
+    }
+    
+    /* SVG Hangman parts */
+    svg line, svg circle {
+        transition: opacity 0.3s ease;
+    }
+    
+    .ronda-info {
+        font-size: 1.2em;
+        color: #666;
+        margin: 15px 0;
+    }
+    
+    .desconexion-warning {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 20px;
+        border-radius: 15px;
+        margin: 20px 0;
+        font-size: 1.2em;
+        border: 2px solid #f5c6cb;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container game-container">
+    <!-- Código de sala -->
+    <div class="code-display">
+        CÓDIGO DE SALA: {{ codigo_sala }}
+    </div>
+    
+    <!-- Header con puntuación y timer -->
+    <div class="header">
+        <div class="score">
+            <span id="puntos-jugador1">0</span> - <span id="puntos-jugador2">0</span>
+        </div>
+        <div class="ronda-info">
+            Ronda: <span id="numero-ronda">-</span>
+        </div>
+        <div class="timer" id="timer">
+            --:--
+        </div>
+    </div>
+    
+    <!-- Mensaje de estado -->
+    <div id="status-message" class="status-message status-waiting">
+        Esperando al segundo jugador...
+    </div>
+    
+    <!-- Warning de desconexión -->
+    <div id="desconexion-warning" class="desconexion-warning hidden">
+        ⚠️ Esperando reconexión del rival... <span id="tiempo-reconexion">20</span>s
+    </div>
+    
+    <!-- Input para palabra secreta -->
+    <div id="input-palabra-container" class="hidden">
+        <input 
+            type="text" 
+            id="input-palabra" 
+            class="input-palabra"
+            placeholder="Escribe la palabra secreta"
+            maxlength="20"
+        >
+        <button class="btn" onclick="enviarPalabra()">Enviar Palabra</button>
+    </div>
+    
+    <!-- Área de juego -->
+    <div id="game-area" class="game-area hidden">
+        <!-- SVG del ahorcado -->
+        <svg class="hangman-svg" width="200" height="250" viewBox="0 0 200 250">
+            <!-- Base (siempre visible) -->
+            <g id="base" class="show">
+                <line x1="10" y1="230" x2="150" y2="230" stroke="#333" stroke-width="4" stroke-linecap="round"/>
+            </g>
+            
+            <!-- Parte 1: Horca completa -->
+            <g id="parte-1" class="hidden">
+                <line x1="50" y1="230" x2="50" y2="20" stroke="#333" stroke-width="4" stroke-linecap="round"/>
+                <line x1="50" y1="20" x2="130" y2="20" stroke="#333" stroke-width="4" stroke-linecap="round"/>
+                <line x1="50" y1="50" x2="80" y2="20" stroke="#333" stroke-width="2" stroke-linecap="round"/>
+            </g>
+            
+            <!-- Parte 2: Cuerda -->
+            <g id="parte-2" class="hidden">
+                <line x1="130" y1="20" x2="130" y2="50" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+            </g>
+            
+            <!-- Parte 3: Cabeza -->
+            <g id="parte-3" class="hidden">
+                <circle cx="130" cy="70" r="20" stroke="#333" stroke-width="3" fill="none"/>
+                <circle cx="122" cy="65" r="2" fill="#333"/>
+                <circle cx="138" cy="65" r="2" fill="#333"/>
+                <path d="M 120 78 Q 130 82 140 78" stroke="#333" stroke-width="2" fill="none"/>
+            </g>
+            
+            <!-- Parte 4: Torso -->
+            <g id="parte-4" class="hidden">
+                <line x1="130" y1="90" x2="130" y2="150" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+            </g>
+            
+            <!-- Parte 5: Brazo izquierdo -->
+            <g id="parte-5" class="hidden">
+                <line x1="130" y1="110" x2="100" y2="130" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+            </g>
+            
+            <!-- Parte 6: Brazo derecho -->
+            <g id="parte-6" class="hidden">
+                <line x1="130" y1="110" x2="160" y2="130" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+            </g>
+            
+            <!-- Parte 7: Pierna izquierda -->
+            <g id="parte-7" class="hidden">
+                <line x1="130" y1="150" x2="110" y2="190" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+            </g>
+            
+            <!-- Parte 8: Pierna derecha -->
+            <g id="parte-8" class="hidden">
+                <line x1="130" y1="150" x2="150" y2="190" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+            </g>
+        </svg>
+        
+        <!-- Área de juego -->
+        <div class="play-area">
+            <div class="palabra-container" id="palabra-display">
+                _ _ _ _ _
+            </div>
+            
+            <!-- Teclado -->
+            <div id="teclado" class="teclado">
+                <!-- Se generará con JavaScript -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Botón volver -->
+    <div style="margin-top: 30px;">
+        <a href="{% url 'game:index' %}" class="btn btn-secondary">
+            Salir de la Sala
+        </a>
+    </div>
+</div>
+
+<!-- Modal de victoria/derrota -->
+<div id="modal-final" class="modal">
+    <div class="modal-content">
+        <div id="resultado-icon"></div>
+        <h2 id="resultado-texto"></h2>
+        <p style="font-size: 1.3em; margin: 20px 0;">
+            Puntuación Final: <span id="puntos-finales"></span>
+        </p>
+        <a href="{% url 'game:index' %}" class="btn">
+            Volver al Menú
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const codigoSala = "{{ codigo_sala }}";
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/sala/${codigoSala}/`;
+    let socket;
+    let miId = null;
+    let jugadorAdivinando = null;
+    let timerInterval = null;
+    let reconexionInterval = null;
+    
+    // Conectar WebSocket
+    function conectarWebSocket() {
+        socket = new WebSocket(wsUrl);
+        
+        socket.onopen = function(e) {
+            console.log('Conectado al WebSocket');
+        };
+        
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            console.log('Mensaje recibido:', data);
+            
+            switch(data.tipo) {
+                case 'jugador_conectado':
+                    manejarJugadorConectado(data);
+                    break;
+                case 'iniciar_ronda':
+                    iniciarRonda(data);
+                    break;
+                case 'palabra_recibida':
+                    palabraRecibida(data);
+                    break;
+                case 'letra_correcta':
+                    letraCorrecta(data);
+                    break;
+                case 'letra_incorrecta':
+                    letraIncorrecta(data);
+                    break;
+                case 'ronda_terminada':
+                    rondaTerminada(data);
+                    break;
+                case 'juego_terminado':
+                    juegoTerminado(data);
+                    break;
+                case 'jugador_desconectado':
+                    jugadorDesconectado(data);
+                    break;
+                case 'jugador_reconectado':
+                    jugadorReconectado(data);
+                    break;
+                case 'actualizar_timer':
+                    actualizarTimerDesdeServidor(data);
+                    break;
+            }
+        };
+        
+        socket.onclose = function(e) {
+            console.log('WebSocket cerrado');
+        };
+        
+        socket.onerror = function(e) {
+            console.error('Error en WebSocket:', e);
+        };
+    }
+    
+    function manejarJugadorConectado(data) {
+        miId = data.tu_id;
+        
+        if (data.total_jugadores === 1) {
+            mostrarMensaje('Esperando al segundo jugador...', 'waiting');
+        } else if (data.total_jugadores === 2) {
+            mostrarMensaje('¡Comenzando el juego!', 'playing');
+        }
+    }
+    
+    function iniciarRonda(data) {
+        jugadorAdivinando = data.jugador_adivinando;
+        document.getElementById('numero-ronda').textContent = data.ronda;
+        actualizarPuntos(data.puntos);
+        resetearAhorcado();
+        
+        // Ocultar área de juego
+        document.getElementById('game-area').classList.add('hidden');
+        
+        if (jugadorAdivinando === miId) {
+            // Yo adivino
+            mostrarMensaje('Espera mientras tu rival escribe la palabra...', 'waiting');
+            document.getElementById('input-palabra-container').classList.add('hidden');
+        } else {
+            // Yo escribo la palabra
+            mostrarMensaje('¡Tu turno! Escribe una palabra para que tu rival adivine', 'input');
+            document.getElementById('input-palabra-container').classList.remove('hidden');
+            document.getElementById('input-palabra').value = '';
+            document.getElementById('input-palabra').focus();
+        }
+    }
+    
+    function enviarPalabra() {
+        const palabra = document.getElementById('input-palabra').value.trim().toUpperCase();
+        
+        if (palabra.length < 3) {
+            alert('La palabra debe tener al menos 3 letras');
+            return;
+        }
+        
+        socket.send(JSON.stringify({
+            tipo: 'enviar_palabra',
+            palabra: palabra
+        }));
+        
+        document.getElementById('input-palabra-container').classList.add('hidden');
+        mostrarMensaje('Palabra enviada. Esperando que tu rival adivine...', 'waiting');
+    }
+    
+    function palabraRecibida(data) {
+        if (jugadorAdivinando === miId) {
+            // Mostrar área de juego
+            document.getElementById('status-message').classList.add('hidden');
+            document.getElementById('game-area').classList.remove('hidden');
+            
+            // Mostrar guiones bajos
+            const palabraDisplay = '_'.repeat(data.longitud_palabra).split('').join(' ');
+            document.getElementById('palabra-display').textContent = palabraDisplay;
+            
+            // Generar teclado
+            generarTeclado();
+            
+            // Iniciar timer
+            iniciarTimer(data.tiempo_restante);
+        }
+    }
+    
+    function generarTeclado() {
+        const teclado = document.getElementById('teclado');
+        teclado.innerHTML = '';
+        const letras = 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'.split('');
+        
+        letras.forEach(letra => {
+            const btn = document.createElement('button');
+            btn.textContent = letra;
+            btn.className = 'letra-btn';
+            btn.dataset.letra = letra;
+            btn.onclick = () => adivinarLetra(letra);
+            teclado.appendChild(btn);
+        });
+    }
+    
+    function adivinarLetra(letra) {
+        const btn = document.querySelector(`button[data-letra="${letra}"]`);
+        if (btn && !btn.disabled) {
+            btn.disabled = true;
+            socket.send(JSON.stringify({
+                tipo: 'adivinar_letra',
+                letra: letra
+            }));
+        }
+    }
+    
+    function letraCorrecta(data) {
+        document.getElementById('palabra-display').textContent = data.palabra_revelada.split('').join(' ');
+    }
+    
+    function letraIncorrecta(data) {
+        document.getElementById('palabra-display').textContent = data.palabra_revelada.split('').join(' ');
+        mostrarParteAhorcado(data.errores);
+    }
+    
+    function mostrarParteAhorcado(errores) {
+        if (errores > 0 && errores <= 8) {
+            document.getElementById(`parte-${errores}`).classList.remove('hidden');
+            document.getElementById(`parte-${errores}`).classList.add('show');
+        }
+    }
+    
+    function resetearAhorcado() {
+        for (let i = 1; i <= 8; i++) {
+            const parte = document.getElementById(`parte-${i}`);
+            parte.classList.remove('show');
+            parte.classList.add('hidden');
+        }
+    }
+    
+    function rondaTerminada(data) {
+        detenerTimer();
+        
+        // Deshabilitar teclado
+        const botones = document.querySelectorAll('.letra-btn');
+        botones.forEach(btn => btn.disabled = true);
+        
+        // Mostrar mensaje
+        const ganaste = data.ganador === miId;
+        const mensaje = ganaste ? 
+            `¡Ganaste esta ronda! La palabra era: ${data.palabra_secreta}` :
+            `Perdiste esta ronda. La palabra era: ${data.palabra_secreta}`;
+        
+        mostrarMensaje(mensaje, ganaste ? 'playing' : 'waiting');
+        
+        // Actualizar puntos
+        actualizarPuntos(data.puntos);
+        
+        // Siguiente ronda después de 3 segundos
+        setTimeout(() => {
+            iniciarRonda({
+                jugador_adivinando: data.siguiente_adivinando,
+                ronda: data.ronda,
+                puntos: data.puntos
+            });
+        }, 3000);
+    }
+    
+    function juegoTerminado(data) {
+        detenerTimer();
+        
+        const ganaste = data.ganador === miId;
+        const modal = document.getElementById('modal-final');
+        const icon = document.getElementById('resultado-icon');
+        const texto = document.getElementById('resultado-texto');
+        const puntos = document.getElementById('puntos-finales');
+        
+        if (ganaste) {
+            icon.className = 'victoria';
+            icon.textContent = '🎉';
+            texto.textContent = '¡VICTORIA!';
+            texto.style.color = '#28a745';
+        } else {
+            icon.className = 'derrota';
+            icon.textContent = '😢';
+            texto.textContent = 'DERROTA';
+            texto.style.color = '#dc3545';
+        }
+        
+        puntos.textContent = `${data.puntos.jugador1} - ${data.puntos.jugador2}`;
+        modal.style.display = 'flex';
+    }
+    
+    function jugadorDesconectado(data) {
+        if (data.jugador_id !== miId) {
+            detenerTimer();
+            document.getElementById('desconexion-warning').classList.remove('hidden');
+            iniciarContadorReconexion();
+        }
+    }
+    
+    function jugadorReconectado(data) {
+        if (data.jugador_id !== miId) {
+            detenerContadorReconexion();
+            document.getElementById('desconexion-warning').classList.add('hidden');
+        }
+    }
+    
+    function iniciarContadorReconexion() {
+        let tiempo = 20;
+        document.getElementById('tiempo-reconexion').textContent = tiempo;
+        
+        reconexionInterval = setInterval(() => {
+            tiempo--;
+            document.getElementById('tiempo-reconexion').textContent = tiempo;
+            
+            if (tiempo <= 0) {
+                detenerContadorReconexion();
+                // Victoria automática
+                juegoTerminado({
+                    ganador: miId,
+                    puntos: { jugador1: 5, jugador2: 0 }
+                });
+            }
+        }, 1000);
+    }
+    
+    function detenerContadorReconexion() {
+        if (reconexionInterval) {
+            clearInterval(reconexionInterval);
+            reconexionInterval = null;
+        }
+    }
+    
+    function iniciarTimer(segundos) {
+        let tiempo = segundos;
+        actualizarTimerDisplay(tiempo);
+        
+        timerInterval = setInterval(() => {
+            tiempo--;
+            actualizarTimerDisplay(tiempo);
+            
+            if (tiempo <= 0) {
+                detenerTimer();
+                // El jugador que adivina pierde por tiempo
+            }
+        }, 1000);
+    }
+    
+    function detenerTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+    }
+    
+    function actualizarTimerDisplay(segundos) {
+        const minutos = Math.floor(segundos / 60);
+        const segs = segundos % 60;
+        document.getElementById('timer').textContent = 
+            `${minutos.toString().padStart(2, '0')}:${segs.toString().padStart(2, '0')}`;
+    }
+    
+    function actualizarPuntos(puntos) {
+        document.getElementById('puntos-jugador1').textContent = puntos.jugador1;
+        document.getElementById('puntos-jugador2').textContent = puntos.jugador2;
+    }
+    
+    function mostrarMensaje(mensaje, tipo) {
+        const statusMsg = document.getElementById('status-message');
+        statusMsg.textContent = mensaje;
+        statusMsg.className = `status-message status-${tipo}`;
+        statusMsg.classList.remove('hidden');
+    }
+    
+    function actualizarTimerDesdeServidor(data) {
+        // Sincronizar el timer del cliente con el del servidor
+        actualizarTimerDisplay(data.tiempo_restante);
+    }
+    
+    // Iniciar conexión
+    conectarWebSocket();
+    
+    // Permitir enviar palabra con Enter
+    document.getElementById('input-palabra')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            enviarPalabra();
+        }
+    });
+</script>
+{% endblock %}
