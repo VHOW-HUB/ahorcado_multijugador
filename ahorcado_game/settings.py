@@ -25,7 +25,10 @@ SECRET_KEY = 'django-insecure-j(wb&zr*47+_^fpw_@^r-i9x$c*4o&jmklz*quly7xu$md@tn8
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "ahorcado-multijugador-1.onrender.com",
+    ".onrender.com"
+]
 
 
 # Application definition
